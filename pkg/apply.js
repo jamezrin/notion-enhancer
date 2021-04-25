@@ -9,7 +9,7 @@
 const fs = require('fs-extra'),
   path = require('path'),
   { readdirIterator } = require('readdir-enhanced'),
-  { extractAll } = require('asar'),
+  { extractAll, createPackage } = require('asar'),
   { readline, realpath, getNotionResources } = require('./helpers.js'),
   { version } = require('../package.json');
 
@@ -35,12 +35,9 @@ module.exports = async function ({ overwrite_version, friendly_errors } = {}) {
       case 3:
         console.warn(` * ${check_app.msg}`);
         const valid = () =>
-          typeof overwrite_version === 'string' &&
-          ['y', 'n', ''].includes(overwrite_version.toLowerCase());
+          typeof overwrite_version === 'string' && ['y', 'n', ''].includes(overwrite_version.toLowerCase());
         if (valid()) {
-          console.info(
-            ` > overwrite? [Y/n]: ${overwrite_version.toLowerCase()}`
-          );
+          console.info(` > overwrite? [Y/n]: ${overwrite_version.toLowerCase()}`);
         }
         while (!valid()) {
           process.stdout.write(' > overwrite? [Y/n]: ');
@@ -50,9 +47,7 @@ module.exports = async function ({ overwrite_version, friendly_errors } = {}) {
           console.info(' ~~ keeping previous version: exiting.');
           return false;
         }
-        console.info(
-          ' -- removing previous enhancements before applying new version.'
-        );
+        console.info(' -- removing previous enhancements before applying new version.');
         if (
           !(await require('./remove.js')({
             delete_data: 'n',
@@ -62,10 +57,13 @@ module.exports = async function ({ overwrite_version, friendly_errors } = {}) {
           return false;
         }
     }
+
+    const unpackedAppDir = path.resolve(`${__notion}/app`);
+
     if (check_app.executable.endsWith('app.asar')) {
       console.info(' ...unpacking app.asar.');
       const asar_bak = path.resolve(`${__notion}/app.asar.bak`);
-      extractAll(check_app.executable, `${path.resolve(`${__notion}/app`)}`);
+      extractAll(check_app.executable, unpackedAppDir);
       if (await fs.pathExists(asar_bak)) fs.remove(asar_bak);
       await fs.move(check_app.executable, asar_bak);
     } else {
@@ -76,39 +74,24 @@ module.exports = async function ({ overwrite_version, friendly_errors } = {}) {
     // patching launch script target of custom wrappers
     if (
       [
-        '/opt/notion-app', // https://aur.archlinux.org/packages/notion-app/
         '/opt/notion', // https://github.com/jaredallard/notion-app
       ].includes(__notion)
     ) {
-      console.info(
-        ' ...patching app launcher (notion-app linux wrappers only).'
-      );
-      for (let bin_path of [
-        `/usr/bin/${__notion.split('/')[2]}`,
-        `${__notion}/${__notion.split('/')[2]}`,
-      ]) {
+      console.info(' ...patching app launcher (notion-app linux wrappers only).');
+      for (let bin_path of [`/usr/bin/${__notion.split('/')[2]}`, `${__notion}/${__notion.split('/')[2]}`]) {
         const bin_script = await fs.readFile(bin_path, 'utf8');
         if (bin_script.includes('app.asar')) {
           await fs.outputFile(
             bin_path,
-            bin_script
-              .replace('electron app.asar', 'electron app')
-              .replace('electron6 app.asar', 'electron6 app')
+            bin_script.replace('electron app.asar', 'electron app').replace('electron6 app.asar', 'electron6 app'),
           );
         }
       }
     }
 
     // patching app properties so dark/light mode can be detected
-    if (
-      process.platform === 'darwin' &&
-      (await fs.pathExists(path.resolve(`${__notion}/../Info.plist`)))
-    ) {
-      fs.copy(
-        path.resolve(`${__dirname}/Info.plist`),
-        path.resolve(`${__notion}/../Info.plist`),
-        { overwrite: true }
-      );
+    if (process.platform === 'darwin' && (await fs.pathExists(path.resolve(`${__notion}/../Info.plist`)))) {
+      fs.copy(path.resolve(`${__dirname}/Info.plist`), path.resolve(`${__notion}/../Info.plist`), { overwrite: true });
     }
 
     for await (let insertion_target of readdirIterator(
@@ -158,10 +141,7 @@ module.exports = async function ({ overwrite_version, friendly_errors } = {}) {
     // not resolved, nothing else in apply process depends on it
     // so it's just a "let it do its thing"
     console.info(' ...recording enhancement version.');
-    fs.outputFile(
-      path.resolve(`${__notion}/app/ENHANCER_VERSION.txt`),
-      version
-    );
+    fs.outputFile(path.resolve(`${__notion}/ENHANCER_VERSION.txt`), version);
 
     console.info(' ~~ success.');
     return true;
@@ -172,18 +152,10 @@ module.exports = async function ({ overwrite_version, friendly_errors } = {}) {
         `file access forbidden - ${
           process.platform === 'win32'
             ? 'make sure your user has elevated permissions.'
-            : `try running "sudo chmod -R a+wr ${err.path.replace(
-                'Notion.app',
-                'Notion'
-              )}" ${
-                err.dest
-                  ? `and/or "sudo chmod -R a+wr ${err.dest.replace(
-                      'Notion.app',
-                      'Notion'
-                    )}"`
-                  : ''
+            : `try running "sudo chmod -R a+wr ${err.path.replace('Notion.app', 'Notion')}" ${
+                err.dest ? `and/or "sudo chmod -R a+wr ${err.dest.replace('Notion.app', 'Notion')}"` : ''
               }`
-        }, and make sure path(s) are not open.`
+        }, and make sure path(s) are not open.`,
       );
     } else if (['EIO', 'EBUSY'].includes(err.code) && friendly_errors) {
       console.error("file access failed: make sure notion isn't running!");

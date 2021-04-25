@@ -57,7 +57,6 @@ module.exports = async function ({ delete_data, friendly_errors } = {}) {
     // patching launch script target of custom wrappers
     if (
       [
-        '/opt/notion-app', // https://aur.archlinux.org/packages/notion-app/
         '/opt/notion', // https://github.com/jaredallard/notion-app
       ].includes(__notion)
     ) {
