@@ -1,5 +1,8 @@
 # <img src="./mods/core/icons/mac+linux.png" height="20px"> notion-enhancer
 
+
+> ## :warning: **Install https://aur.archlinux.org/packages/notion-app-enhanced/ instead, it bundles the enhancer and doesn't require any additional manual steps.**
+
 notion.so is a pretty awesome tool already, but there's always room for improvements.
 it might just be a preference, it might be something crucial to your setup,
 it might be something users have been asking for for a long time,
